@@ -1,16 +1,21 @@
 <?php
-require "pyloncrc.php";
+namespace robske_110\pylonlv\protocol;
 
-function hexStr($data, $len = 2){
+use robske_110\pylonlv\protocol\CRC;
+
+function hexStr(string $data, $len = 2){
 	return strtoupper(str_pad(dechex($data), $len, "0", STR_PAD_LEFT));
 }
 #var_dump(hexStr(50));
 #var_dump(hexStr(crc16_pylon($command)));
 
 $b = new Frame();
-/*$b->decode("~200246040000FDAE");*/
-$b->decode("~20024600F07A11020F0CDE0CDC0CE20CDE0CE30CE30CE30CDF0CD80CDD0CE00CDE0CE20CE10CDF050B870B870B870B870B870000C117FFFF04FFFF00000070BC012110E1E7");
-/*$b->decode("~20014600C06E11010F0D450D440D450D440D450D440D3E0D450D4A0D4A0D4B0D4A0D4A0D4A0D4A050BC30BC30BC30BCD0BCD0000C725BF6802C3500002E553");*/
+/*$b->decode("~200246040000FDAE
+");*/
+$b->decode("~20024600F07A11020F0CDE0CDC0CE20CDE0CE30CE30CE30CDF0CD80CDD0CE00CDE0CE20CE10CDF050B870B870B870B870B870000C117FFFF04FFFF00000070BC012110E1E7
+");
+/*$b->decode("~20014600C06E11010F0D450D440D450D440D450D440D3E0D450D4A0D4A0D4B0D4A0D4A0D4A0D4A050BC30BC30BC30BCD0BCD0000C725BF6802C3500002E553
+");*/
 echo("\n\n\n");
 
 function out(string $str){
@@ -44,7 +49,7 @@ class Frame{
 		$payload .= hexStr($this->cid2);
 		$payload .= $this->info->encode();
 		echo("Payload: ".$payload."\n");
-		return pack("c", self::SOI).$payload.crc16_pylon($payload).pack("c", self::EOI);
+		return pack("c", self::SOI).$payload.CRC::crc16_pylon($payload).pack("c", self::EOI);
 	}
 	
 	public function decode(string $data){
