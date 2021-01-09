@@ -25,13 +25,46 @@ function readByte($data, &$pos){
 	return $data[$pos].$data[$pos+1];
 }
 
+class CID2{
+	const ANALOG_VALUE = 0x42;
+	const ALARM_INFO = 0x44;
+	const SYSTEM_PARAM = 0x47;
+	const PROTOCOL_VERSION = 0x4F;
+	const MANUFACTURER = 0x51;
+	const CHARGE_DISCHG_MANAGMENT = 0x92;
+	const SERIAL_NUMBER = 0x93;
+	const SET_CHG_DISCHG_MANAGMENT = 0x94;
+	const TURNOFF = 0x95;
+	const FIRMWARE_INFO = 0x96;
+}
+
+class CID2response{
+	const NORMAL = 0x00;
+	const VER_ERROR = 0x01;
+	const CHKSUM_ERROR = 0x02;
+	const LCHKSUM_ERROR = 0x03;
+	const CID2_INVALID = 0x04;
+	const COMMAND_FORMAT_ERROR = 0x05;
+	const INFO_DATA_INVALID = 0x06;
+	const ADR_ERROR = 0x90;
+	const INTERNAL_COMMUNICATION_ERROR = 0x91;
+}
+
 class Frame{
+	/**
+	 * Frame:
+	 * Byte len: |  1  |  1  |  1  |  1   |  1   |   2    | LEN/2 |   2    |  1  |
+	 * ----------|-----|-----|-----|------|------|--------|-------|--------|-----|
+	 * Content:  | SOI | VER | ADR | CID1 | CID2 | LENGTH | INFO  | CHKSUM | EOI |
+	 */
 	const SOI = 0x7E; //START OF INFORMATION
 	const EOI = 0x0D; //END OF INFORMATION
+	const PROTOCOL_VERSION = 0x20; //Protocol version in hexadecimal representation (read as 2.0)
+	const CID1_BATTERY_DATA = 0x46; //battery data CID1
 	
-	private int $version = 0x20; // VER byte: Hexadecimal representation
-	private int $addr = 0x02;
-	private int $cid1 = 0x46;
+	private int $version = self::PROTOCOL_VERSION; // VER byte
+	private int $addr = 0x02; //ADR byte: Address 0-255
+	private int $cid1 = self::CID1_BATTERY_DATA; //CID1 byte: Control Identify Code
 	private int $cid2 = 0x42;
 	
 	private FrameInfo $info;
