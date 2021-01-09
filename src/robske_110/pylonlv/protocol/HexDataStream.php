@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace robske_110\pylonlv\protocol;
 
 /**
@@ -31,8 +32,8 @@ class HexDataStream{
 	
 	/**
 	 * Reads a decimal from the stream.
-	 * @param int $byteLen
-	 * @return string
+	 * @param int $byteLen The number of bytes to read (
+	 * @return int
 	 */
 	public function getDec(int $byteLen = 1): int{
 		return hexdec($this->getHex($byteLen));
@@ -40,7 +41,7 @@ class HexDataStream{
 	
 	/**
 	 * Reads a hex byte (two chars / real bytes) from the stream.
-	 * @param int $heyBytes
+	 * @param int $hexBytes The number of hexbytes to read
 	 * @return string
 	 */
 	public function getHex(int $hexBytes = 1): string{
