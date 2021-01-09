@@ -1,19 +1,17 @@
 <?php
 namespace robske_110\pylonlv\protocol;
+require("../../../Autoloader.php");
 
 use robske_110\pylonlv\protocol\CRC;
 
 function hexStr(string $data, $len = 2){
 	return strtoupper(str_pad(dechex($data), $len, "0", STR_PAD_LEFT));
 }
-#var_dump(hexStr(50));
-#var_dump(hexStr(crc16_pylon($command)));
 
 $b = new Frame();
 /*$b->decode("~200246040000FDAE
 ");*/
-$b->decode("~20024600F07A11020F0CDE0CDC0CE20CDE0CE30CE30CE30CDF0CD80CDD0CE00CDE0CE20CE10CDF050B870B870B870B870B870000C117FFFF04FFFF00000070BC012110E1E7
-");
+$b->decode(new HexDataStream("~20024600F07A11020F0CDE0CDC0CE20CDE0CE30CE30CE30CDF0CD80CDD0CE00CDE0CE20CE10CDF050B870B870B870B870B870000C117FFFF04FFFF00000070BC012110E1E7\r"));
 /*$b->decode("~20014600C06E11010F0D450D440D450D440D450D440D3E0D450D4A0D4A0D4B0D4A0D4A0D4A0D4A050BC30BC30BC30BCD0BCD0000C725BF6802C3500002E553
 ");*/
 echo("\n\n\n");
@@ -49,54 +47,59 @@ class Frame{
 		$payload .= hexStr($this->cid2);
 		$payload .= $this->info->encode();
 		echo("Payload: ".$payload."\n");
-		return pack("c", self::SOI).$payload.CRC::crc16_pylon($payload).pack("c", self::EOI);
+		return pack("c", self::SOI).$payload.CRC::pylonCRC16($payload).pack("c", self::EOI);
 	}
 	
-	public function decode(string $data){
-		if(unpack("c", $data[0])[1] != self::SOI){
+	public function decode(HexDataStream $data){
+		if(ord($data->readRaw()) != self::SOI){
 			echo("Could not find SOI\n");
 		}
-		if(unpack("c", $data[strlen($data)-1])[1] != self::EOI){
-			echo("Could not find EOI\n");
-		}
-		$pos = -1;
-		out("ProtV:".readByte($data, $pos));
-		out("Address:".readByte($data, $pos));
-		out("CID1:".readByte($data, $pos));
-		out("CID2:".readByte($data, $pos));
-		$val = hexdec(readByte($data, $pos).readByte($data, $pos));
-		$byteLen = ($val & 0x0FFF)/2;
+		out("ProtV:".$data->getHex());
+		out("Address:".$data->getHex());
+		out("CID1:".$data->getHex());
+		out("CID2:".$data->getHex());
+		$val = $data->getDec(2);
+		$byteLen = ($val & 0x0FFF)/2; //strip crc from length
 		out("byteLen: ".$byteLen);
-		out("InfoFlag:".decbin(readByte($data, $pos)));
-		out("DataAI:".readByte($data, $pos)); //#packs?
-		$numCells = hexdec(readByte($data, $pos));
+		/*var_dump(decbin($val));
+		var_dump(decbin(CRC::pylonInfoLenCRC($byteLen)));
+		if($val !== CRC::pylonInfoLenCRC($byteLen)){
+			echo("ERROR: CRC MISMATCH!!!!");
+		}*/
+		out("InfoFlag:".decbin($data->getDec()));
+		out("DataAI:".$data->getHex()); //#packs?
+		$numCells = $data->getDec();
 		out("#Cells: ".$numCells);
 		for($i = 0; $i < $numCells; ++$i){
-			out("Cell".($i+1)." Voltage: ".hexdec(readByte($data, $pos).readByte($data,$pos)));
+			out("Cell".($i+1)." Voltage: ".$data->getDec(2));
 		}
-		$numTemps = hexdec(readByte($data, $pos));
+		$numTemps = $data->getDec();
 		out("#Temps: ".$numTemps);
 		for($i = 0; $i < $numTemps; ++$i){
-			out("Temp".($i+1).": ".(hexdec(readByte($data, $pos).readByte($data,$pos))-2731));
+			out("Temp".($i+1).": ".($data->getDec(2)-2731));
 		}
-		$packCurrent = hexdec(readByte($data, $pos).readByte($data, $pos));
+		$packCurrent = $data->getDec(2);
 		out("PackCurrent (A): ".$packCurrent*0.1);
-		out("PackVoltage (mV): ".hexdec(readByte($data, $pos).readByte($data, $pos)));
-		out("PackResidual_old (mAh): ".hexdec(readByte($data, $pos).readByte($data, $pos)));
-		out("CustomQuantity:".readByte($data, $pos));
-		out("PackTotal_old (mAh): ".hexdec(readByte($data, $pos).readByte($data, $pos)));
-		out("BattCycles: ".hexdec(readByte($data, $pos).readByte($data, $pos)));
-		$pR = hexdec(readByte($data, $pos).readByte($data, $pos).readByte($data, $pos));
+		out("PackVoltage (mV): ".$data->getDec(2));
+		out("PackResidual_old (mAh): ".$data->getDec(2));
+		out("CustomQuantity:".$data->getHex());
+		out("PackTotal_old (mAh): ".$data->getDec(2));
+		out("BattCycles: ".$data->getDec(2));
+		$pR = $data->getDec(3);
 		out("PackResidual (mAh): ".$pR);
-		$pT = hexdec(readByte($data, $pos).readByte($data, $pos).readByte($data, $pos));
+		$pT = $data->getDec(3);
 		out("PackTotal (mAh): ".$pT);
 		out("CALC_SOC:".(($pR/$pT)*100)."%");
-		$payload = substr($data, 1, $pos+1);
-		if(crc16_pylon($payload) !== readByte($data, $pos).readByte($data, $pos)){
+		$payload = substr($data->rawData(), 1, $data->rawPos()-1);
+		if(CRC::pylonCRC16($payload) !== $data->getHex(2)){
 			echo("ERROR: CRC MISMATCH!!!!!");
 		}else{
 			echo("CRC OK");
 		}
+		if(ord($data->readRaw()) != self::EOI){
+			echo("Could not find EOI\n");
+		}
+		var_dump($data->remaining());
 	}
 }
 
@@ -105,9 +108,7 @@ class FrameInfo{
 	public function encode(): string{
 		//retarded crc for pylon length (WHY A CRC IN A FRAME THAT ALREADY HAS A CRC)
 		$len = 2;
-		$crc = ($len >> 8 & 0xF) + ($len >> 4 & 0xF) + ($len & 0xF); //12bit len number, add each 4 bit as a number together
-		$crc = (~($crc % 16) + 1) & 0xF;
-		$lengthWithCRC = $len + ($crc << 12);
+		$lengthWithCRC = CRC::pylonInfoLenCRC($len);
 		var_dump(decbin($lengthWithCRC));
 		return hexStr($lengthWithCRC, 4)."02";
 	}
