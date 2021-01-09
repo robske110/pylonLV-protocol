@@ -2,8 +2,6 @@
 declare(strict_types=1);
 
 use robske_110\Logger\Logger;
-use robske_110\pylonlv\protocol\command\AnalogValue;
-use robske_110\pylonlv\protocol\command\ProtocolVersion;
 use robske_110\pylonlv\protocol\HexDataStream;
 use robske_110\pylonlv\PylonSerial;
 
@@ -19,7 +17,6 @@ $pylonSerial->send($a->encode());
 
 $a->decode(new HexDataStream($pylonSerial->readUntil()));
 echo($a);
-
 
 exit;
 $b = new AnalogValue(0x02);
