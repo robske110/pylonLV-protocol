@@ -2,16 +2,14 @@
 declare(strict_types=1);
 namespace robske_110\pylonlv\protocol;
 
+use robske_110\Logger\Logger;
 use robske_110\pylonlv\protocol\CRC;
 use robske_110\pylonlv\protocol\exception\CommandError;
 use robske_110\pylonlv\protocol\exception\CommandInvalid;
+use robske_110\pylonlv\protocol\exception\FrameDecodeError;
 
 function hexStr(int $data, $len = 2){
 	return strtoupper(str_pad(dechex($data), $len, "0", STR_PAD_LEFT));
-}
-
-function out(string $str){
-	echo($str."\n");
 }
 
 
@@ -44,17 +42,17 @@ class Frame{
 		$payload .= hexStr($this->cid1);
 		$payload .= hexStr($this->cid2);
 		$payload .= $this->info->encode();
-		echo("Payload: ".$payload."\n");
+		Logger::debug("Payload: ".$payload."\n");
 		return chr( self::SOI).$payload.CRC::pylonCRC16($payload).chr(self::EOI);
 	}
 	
 	public function decode(HexDataStream $data){
 		if(ord($data->readRaw()) != self::SOI){
-			echo("Could not find SOI\n");
+			throw new FrameDecodeError("Could not find SOI");
 		}
-		out("ProtV:".$data->getHex());
-		out("Address:".$data->getHex());
-		out("CID1:".$data->getHex());
+		Logger::debug("ProtV:".$data->getHex());
+		Logger::debug("Address:".$data->getHex());
+		Logger::debug("CID1:".$data->getHex());
 		$cid2 = $data->getHex();
 		$cid2d = hexdec($cid2);
 		if($cid2d != CID2response::NORMAL){
@@ -71,50 +69,70 @@ class Frame{
 					throw new CommandInvalid("Command is invalid: ".CID2response::toString($cid2d));
 			}
 		}
-		out("CID2:".$cid2);
+		Logger::debug("CID2:".$cid2);
 		$val = $data->getDec(2);
 		$byteLen = ($val & 0x0FFF)/2; //strip crc from length
-		out("byteLen: ".$byteLen);
-		/*var_dump(decbin($val));
+		Logger::debug("byteLen: ".$byteLen);
+		var_dump(decbin($val));
 		var_dump(decbin(CRC::pylonInfoLenCRC($byteLen)));
 		if($val !== CRC::pylonInfoLenCRC($byteLen)){
-			echo("ERROR: CRC MISMATCH!!!!");
-		}*/
-		out("InfoFlag:".decbin($data->getDec()));
+			Logger::debug("ERROR: CRC MISMATCH!!!!");
+		}
+		if($byteLen >= 1){
+			$readChars = $data->remaining();
+			Logger::debug("InfoFlag:".decbin($data->getDec()));
+			
+			$this->decodeInfo($data, $byteLen-1);
+			
+			$readChars = $readChars-$data->remaining();
+			Logger::debug("read ".$readChars." chars");
+			if($readChars < $byteLen*2){
+				$skipChars = $byteLen*2 - $readChars;
+				Logger::warning("Did not decode whole INFO: Skipping ".$skipChars." chars");
+				$data->skipPos($skipChars);
+			}elseif($readChars > $byteLen*2){
+				throw new FrameDecodeError("Error while decoding INFO: Read past INFO block.");
+			}
+		}
 		
-		out("DataAI:".$data->getHex()); //#packs?
-		$numCells = $data->getDec();
-		out("#Cells: ".$numCells);
-		for($i = 0; $i < $numCells; ++$i){
-			out("Cell".($i+1)." Voltage: ".$data->getDec(2));
-		}
-		$numTemps = $data->getDec();
-		out("#Temps: ".$numTemps);
-		for($i = 0; $i < $numTemps; ++$i){
-			out("Temp".($i+1).": ".($data->getDec(2)-2731));
-		}
-		$packCurrent = $data->getDec(2);
-		out("PackCurrent (A): ".$packCurrent*0.1);
-		out("PackVoltage (mV): ".$data->getDec(2));
-		out("PackResidual_old (mAh): ".$data->getDec(2));
-		out("CustomQuantity:".$data->getHex());
-		out("PackTotal_old (mAh): ".$data->getDec(2));
-		out("BattCycles: ".$data->getDec(2));
-		$pR = $data->getDec(3);
-		out("PackResidual (mAh): ".$pR);
-		$pT = $data->getDec(3);
-		out("PackTotal (mAh): ".$pT);
-		out("CALC_SOC:".(($pR/$pT)*100)."%");
+		var_dump($data->remaining());
+		
 		$payload = substr($data->rawData(), 1, $data->rawPos()-1);
 		if(CRC::pylonCRC16($payload) !== $data->getHex(2)){
-			echo("ERROR: CRC MISMATCH!!!!!");
+			Logger::debug("ERROR: CRC MISMATCH!!!!!");
 		}else{
-			echo("CRC OK");
+			Logger::debug("CRC OK");
 		}
 		if(ord($data->readRaw()) != self::EOI){
-			echo("Could not find EOI\n");
+			throw new FrameDecodeError("Could not find EOI");
 		}
 		var_dump($data->remaining());
+	}
+	
+	private function decodeInfo(HexDataStream $data, int $infoLength){
+		Logger::debug("DataAI:".$data->getHex()); //#packs?
+		$numCells = $data->getDec();
+		Logger::debug("#Cells: ".$numCells);
+		for($i = 0; $i < $numCells; ++$i){
+			Logger::debug("Cell".($i+1)." Voltage: ".$data->getDec(2));
+		}
+		$numTemps = $data->getDec();
+		Logger::debug("#Temps: ".$numTemps);
+		for($i = 0; $i < $numTemps; ++$i){
+			Logger::debug("Temp".($i+1).": ".($data->getDec(2)-2731));
+		}
+		$packCurrent = $data->getDec(2);
+		Logger::debug("PackCurrent (A): ".$packCurrent*0.1);
+		Logger::debug("PackVoltage (mV): ".$data->getDec(2));
+		Logger::debug("PackResidual_old (mAh): ".$data->getDec(2));
+		Logger::debug("CustomQuantity:".$data->getHex());
+		Logger::debug("PackTotal_old (mAh): ".$data->getDec(2));
+		Logger::debug("BattCycles: ".$data->getDec(2));
+		$pR = $data->getDec(3);
+		Logger::debug("PackResidual (mAh): ".$pR);
+		$pT = $data->getDec(3);
+		Logger::debug("PackTotal (mAh): ".$pT);
+		Logger::debug("CALC_SOC:".(($pR/$pT)*100)."%");
 	}
 }
 
