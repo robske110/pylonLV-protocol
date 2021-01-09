@@ -25,6 +25,9 @@ class Frame{
 	protected int $cid1 = self::CID1_BATTERY_DATA; //CID1: Control Identify Code 1
 	protected int $cid2; //CID2
 	
+	/** @var int (only used on decode) Raw (char) info length */
+	protected int $infoLen;
+	
 	/**
 	 * Frame constructor.
 	 * @param int $cid2      1 byte commandID. See CID2 for possible values.
@@ -57,55 +60,60 @@ class Frame{
 	
 	public function decode(HexDataStream $data){
 		if(ord($data->readRaw()) != self::SOI){
+			var_dump($data->rawData());
 			throw new FrameDecodeError("Could not find SOI");
 		}
-		Logger::debug("ProtV:".$data->getHex());
+		
+		$version = $data->getDec();
+		if($version !== $this->version){
+			Logger::warning("Warning: Frame protocol versions do not match!");
+		}
+		
 		$addr = $data->getDec();
-		Logger::debug("Address:".$addr);
 		if($this->addr !== null && $this->addr !== $addr){
 			Logger::warning("Error while decoding FrameHeader: Address does not mach!");
 		}
 		$this->addr = $addr;
-		Logger::debug("CID1:".$data->getHex());
-		$cid2 = $data->getHex();
-		$cid2d = hexdec($cid2);
-		if($cid2d != CID2response::NORMAL){
-			switch($cid2d){
+		
+		$cid1 = $data->getDec();
+		if($version !== $this->version){
+			Logger::warning("Unknown CID1: ".Hex::decToHexStr($cid1));
+		}
+		$cid2 = $data->getDec();
+		if($cid2 != CID2response::NORMAL){
+			switch($cid2){
 				case CID2response::VER_ERROR:
 				case CID2response::CHKSUM_ERROR:
 				case CID2response::LCHKSUM_ERROR:
 				case CID2response::COMMAND_FORMAT_ERROR:
 				case CID2response::ADR_ERROR:
 				case CID2response::INTERNAL_COMMUNICATION_ERROR:
-					throw new CommandError("Command returned an error: ".CID2response::toString($cid2d));
+					throw new CommandError("Command returned an error: ".CID2response::toString($cid2));
 				case CID2response::CID2_INVALID:
 				case CID2response::INFO_DATA_INVALID:
-					throw new CommandInvalid("Command is invalid: ".CID2response::toString($cid2d));
+					throw new CommandInvalid("Command is invalid: ".CID2response::toString($cid2));
 			}
 		}
-		Logger::debug("CID2:".$cid2);
+		$this->cid2 = $cid2;
 		
 		$lenRaw = $data->getDec(2);
-		$byteLen = ($lenRaw & 0x0FFF)/2; //strip crc from length and divide by two to get byte length
-		Logger::debug("byteLen: ".$byteLen);
-		var_dump(decbin($lenRaw));
-		var_dump(decbin(CRC::pylonInfoLenCRC($byteLen*2)));
-		if($lenRaw !== CRC::pylonInfoLenCRC($byteLen*2)){
-			Logger::warning("Length checksum not correct!");
+		$this->infoLen = ($lenRaw & 0x0FFF); //strip crc from length
+		if($lenRaw !== CRC::pylonInfoLenCRC($this->infoLen)){
+			Logger::warning("Length checksum not correct! lenRaw:".decbin($lenRaw)." lenCalc:".decbin(CRC::pylonInfoLenCRC($this->infoLen)));
 		}
-		if($byteLen >= 1){
+		if($this->infoLen >= 2){
 			$readChars = $data->remaining();
-			Logger::debug("InfoFlag:".decbin($data->getDec()));
+			Logger::debug("InfoFlag:".decbin($data->getDec())); //TODO
 			
-			$this->decodeInfo($data, $byteLen-1);
+			$this->decodeInfo($data, ($this->infoLen/2)-1);
 			
-			$readChars = $readChars-$data->remaining();
+			$readChars = $readChars - $data->remaining();
 			Logger::debug("read ".$readChars." chars");
-			if($readChars < $byteLen*2){
-				$skipChars = $byteLen*2 - $readChars;
+			if($readChars < $this->infoLen){
+				$skipChars = $this->infoLen - $readChars;
 				Logger::warning("Did not decode whole INFO: Skipping ".$skipChars." chars");
 				$data->skipPos($skipChars);
-			}elseif($readChars > $byteLen*2){
+			}elseif($readChars > $this->infoLen){
 				throw new FrameDecodeError("Error while decoding INFO: Read past INFO block.");
 			}
 		}
@@ -114,7 +122,7 @@ class Frame{
 		
 		$payload = substr($data->rawData(), 1, $data->rawPos()-1);
 		if(CRC::pylonCRC16($payload) !== $data->getHex(2)){
-			Logger::warning("Frame checksum not correct!");
+			throw new FrameDecodeError("Frame checksum not correct!");
 		}
 		
 		if(ord($data->readRaw()) != self::EOI){
@@ -133,7 +141,12 @@ class Frame{
 	}
 	
 	public function infoString(): string{
-		//TODO
+		return  "Frame Header:".PHP_EOL.
+				"Protocol Version: ".Hex::decToHexStr($this->version).PHP_EOL.
+				"Address: ".Hex::decToHexStr($this->addr).PHP_EOL.
+				"CID1: ".Hex::decToHexStr($this->cid1).PHP_EOL.
+				"CID2: ".Hex::decToHexStr($this->cid2).PHP_EOL.
+				"InfoLength:".$this->infoLen.PHP_EOL;
 	}
 	
 	public function __toString(): string{

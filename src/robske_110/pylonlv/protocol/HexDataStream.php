@@ -18,8 +18,8 @@ class HexDataStream{
 		$this->pos = $pos;
 	}
 	
-	public function skipPos(int $len = 1){
-		$this->pos += $len*2;
+	public function skipPos(int $len = 2){
+		$this->pos += $len;
 	}
 	
 	public function rawPos(): int{
