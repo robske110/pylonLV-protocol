@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 namespace robske_110\pylonlv;
 
 use robske_110\Logger\Logger;
@@ -7,10 +8,15 @@ class PylonSerial{
 	/** @var string */
 	private $deviceFile;
 	
+	/** @var int */
+	private int $baudrate;
+	
+	/** @var resource */
 	private $stream;
 	
-	public function __construct(string $deviceFile){
+	public function __construct(string $deviceFile, int $baudrate = 115200){
 		$this->deviceFile = $deviceFile;
+		$this->baudrate = $baudrate;
 	}
 	
 	public function open(){
@@ -18,7 +24,7 @@ class PylonSerial{
 		if($this->stream === false){
 			echo("FAILED TO OPEN");
 		}
-		exec("stty -f ".$this->deviceFile." 115200 cs8 -cstopb -parenb");
+		exec("stty -f ".$this->deviceFile." ".$this->baudrate." cs8 -cstopb -parenb");
 		stream_set_blocking($this->stream, false);
 	}
 	
