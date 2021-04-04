@@ -2,7 +2,6 @@
 declare(strict_types=1);
 namespace robske_110\pylonlv\protocol;
 
-
 abstract class CID2{
 	const ANALOG_VALUE = 0x42;
 	const ALARM_INFO = 0x44;

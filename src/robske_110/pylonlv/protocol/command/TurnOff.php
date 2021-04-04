@@ -5,9 +5,7 @@ namespace robske_110\pylonlv\protocol\command;
 use robske_110\pylonlv\protocol\CID2;
 use robske_110\pylonlv\protocol\HexHelper;
 
-
 class TurnOff extends Command{
-	
 	public function __construct(?int $addr = null){
 		parent::__construct(CID2::TURNOFF, $addr);
 	}

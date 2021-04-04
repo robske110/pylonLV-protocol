@@ -13,7 +13,7 @@ class ChargeDischargeManagement extends Command{
 	public int $dischargeCurrentLimit;
 	
 	public int $chargeStatus;
-	public bool $chargeEnabled; //If false, battery wants you to not charge..
+	public bool $chargeEnabled; //If false, battery wants you to not charge.
 	public bool $dischargeEnabled; //If false, battery wants you to not discharge.
 	public bool $chargeImmediately1; //If true, battery wants to be immediately charged
 	public bool $chargeImmediately2; //If true, battery wants to be immediately charged, but less urgent?
