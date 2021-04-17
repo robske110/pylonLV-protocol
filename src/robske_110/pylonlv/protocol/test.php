@@ -5,7 +5,7 @@ use robske_110\Logger\Logger;
 use robske_110\pylonlv\protocol\HexDataStream;
 use robske_110\pylonlv\PylonSerial;
 
-require("../../../Autoloader.php");
+require(dirname(__FILE__, 5)."/vendor/autoload.php");
 Logger::init();
 
 
