@@ -24,7 +24,11 @@ class PylonSerial{
 		if($this->stream === false){
 			echo("FAILED TO OPEN");
 		}
-		exec("stty -f ".$this->deviceFile." ".$this->baudrate." cs8 -cstopb -parenb");
+		$fileArg = "-F";
+		if(str_contains(php_uname("s"), "Darwin")){
+			$fileArg = "-f";
+		}
+		exec("stty ".$fileArg." ".$this->deviceFile." ".$this->baudrate." cs8 -cstopb -parenb");
 		stream_set_blocking($this->stream, false);
 	}
 	
